@@ -41,6 +41,8 @@ ghostdriver.SessionReqHand = function(session) {
         ELEMENT_DIR     : "/element/",
         TITLE           : "title",
         WINDOW          : "window",
+        CURRENT         : "current",
+        SIZE            : "size",
         FORWARD         : "forward",
         BACK            : "back",
         REFRESH         : "refresh",
@@ -87,6 +89,9 @@ ghostdriver.SessionReqHand = function(session) {
             } else if (req.method === "POST") {
                 _postWindowCommand(req, res);   //< change focus to the given window
             }
+            return;
+        } else if (req.urlParsed.chunks[0] === _const.WINDOW) {
+            _handleWindow(req, res);
             return;
         } else if (req.urlParsed.file === _const.ELEMENT && req.method === "POST") {    //< ".../element"
             _postElementCommand(req, res);
@@ -148,6 +153,25 @@ ghostdriver.SessionReqHand = function(session) {
         };
     },
 
+    _handleWindow = function(req, res) {
+        var windowHandle = req.urlParsed.chunks[1],
+            command = req.urlParsed.chunks[2];
+
+        // TODO - We need support for multiple windows:
+        // instead of checking request is for "current", we should
+        // check if it's not, and if not then apply to specific window instead
+        // of _session.getCurrentWindow().
+        // TODO handle NoSuchWindow - If the specified window cannot be found.
+        if(windowHandle === _const.CURRENT) {
+            if(command === _const.SIZE && req.method === "POST") {
+                _postWindowSizeCommand(req, res);
+                return;
+            } else if(command === _const.SIZE && req.method === "GET") {
+                _getWindowSizeCommand(req, res);
+                return;
+            }
+        }
+    },
 
     _refreshCommand = function(req, res) {
         var successHand = _createOnSuccessHandler(res);
@@ -246,7 +270,7 @@ ghostdriver.SessionReqHand = function(session) {
     },
 
     _getScreenshotCommand = function(req, res) {
-        var rendering = _session.getCurrentWindow().renderBase64PNG();
+        var rendering = _session.getCurrentWindow().renderBase64("png");
         res.success(_session.getId(), rendering);
     },
 
@@ -401,6 +425,7 @@ ghostdriver.SessionReqHand = function(session) {
     },
 
     _deleteCookieCommand = function(req, res) {
+        // Delete all cookies visible to the current page.
         _session.getCurrentWindow().evaluate(function() {
             var p = document.cookie.split(";"),
                 i, key;
@@ -422,6 +447,36 @@ ghostdriver.SessionReqHand = function(session) {
     _postWindowCommand = function(req, res) {
         // TODO
         // TODO An optional JSON parameter "name" might be given
+    },
+
+    _postWindowSizeCommand = function(req, res) {
+        var params = JSON.parse(req.post),
+            newWidth = params.width,
+            newHeight = params.height;
+
+        // If width/height are passed in string, force them to numbers
+        if (typeof(params.width) === "string") {
+            newWidth = parseInt(params.width, 10);
+        }
+        if (typeof(params.height) === "string") {
+            newHeight = parseInt(params.height, 10);
+        }
+
+        // If a number was not found, the command is
+        if (isNaN(newWidth) || isNaN(newHeight)) {
+            throw _errors.createInvalidReqInvalidCommandMethodEH(req);
+        }
+
+        _session.getCurrentWindow().viewportSize = {
+            width : newWidth,
+            height : newHeight
+        };
+        res.success(_session.getId());
+    },
+
+    _getWindowSizeCommand = function(req, res) {
+        // Returns response in the format "{width: number, height: number}"
+        res.success(_session.getId(), _session.getCurrentWindow().viewportSize);
     },
 
     _getTitleCommand = function(req, res) {

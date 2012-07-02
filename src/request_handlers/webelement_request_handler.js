@@ -35,16 +35,21 @@ ghostdriver.WebElementReqHand = function(id, session) {
     _session = session,
     _protoParent = ghostdriver.WebElementReqHand.prototype,
     _const = {
-        CLICK           : "click",
         VALUE           : "value",
         SUBMIT          : "submit",
-        CLEAR           : "clear",
         ENABLED         : "enabled",
         DISPLAYED       : "displayed",
         ATTRIBUTE       : "attribute",
         NAME            : "name",
         LOCATION        : "location",
         SIZE            : "size"   
+        CLICK           : "click",
+        SELECTED        : "selected",
+        CLEAR           : "clear",
+        CSS             : "css",
+        TEXT            : "text",
+        EQUALS_DIR      : "equals"
+>>>>>>> upstream/master
     },
     _errors = require("./errors.js"),
 
@@ -64,6 +69,9 @@ ghostdriver.WebElementReqHand = function(id, session) {
         } else if (req.urlParsed.file === _const.DISPLAYED && req.method === "GET") {
             _getDisplayedCommand(req, res);
             return;
+        } else if (req.urlParsed.file === _const.ENABLED && req.method === "GET") {
+            _getEnabledCommand(req, res);
+            return;
         } else if (req.urlParsed.chunks[0] === _const.ATTRIBUTE && req.method === "GET") {
             _getAttributeCommand(req, res);
             return;
@@ -73,19 +81,28 @@ ghostdriver.WebElementReqHand = function(id, session) {
         } else if (req.urlParsed.file === _const.CLICK && req.method === "POST") {
             _postClickCommand(req, res);
             return;
-        } else if (req.urlParsed.file === _const.CLEAR && req.method === "POST") {
-            _postClearCommand(req, res);
-            return;
         } else if (req.urlParsed.file === _const.LOCATION && req.method === "GET") {
             _getLocationCommand(req, res);
             return;
         } else if (req.urlParsed.file === _const.SIZE && req.method === "GET") {
             _getSizeCommand(req, res);
             return;
-        } else if (req.urlParsed.file === _const.ENABLED && req.method === "GET") {
-            _getEnabledCommand(req, res);
+        } else if (req.urlParsed.file === _const.SELECTED && req.method === "GET") {
+            _getSelectedCommand(req, res);
             return;
-        }    // else ...
+        } else if (req.urlParsed.file === _const.CLEAR && req.method === "POST") {
+            _postClearCommand(req, res);
+            return;
+        } else if (req.urlParsed.chunks[0] === _const.CSS && req.method === "GET") {
+            _getCssCommand(req, res);
+            return;
+        } else if (req.urlParsed.file === _const.TEXT && req.method === "GET") {
+            _getTextCommand(req, res);
+            return;
+        } else if (req.urlParsed.chunks[0] === _const.EQUALS && req.method === "GET") {
+            _getEqualsCommand(req, res);
+            return;
+        } // else ...
 
         // TODO lots to do...
 
@@ -93,8 +110,9 @@ ghostdriver.WebElementReqHand = function(id, session) {
     },
 
     _getDisplayedCommand = function(req, res) {
-        var isDisplayedAtom = require("./webdriver_atoms.js").get("is_displayed");
-        var displayed = _session.getCurrentWindow().evaluate(isDisplayedAtom, _getJSON());
+        var displayed = _session.getCurrentWindow().evaluate(
+            require("./webdriver_atoms.js").get("is_displayed"),
+            _getJSON());
         res.respondBasedOnResult(_session, req, displayed);
     },
 
@@ -113,9 +131,9 @@ ghostdriver.WebElementReqHand = function(id, session) {
     },
 
     _getEnabledCommand = function(req, res) {
-        var getEnabledAtom = require("./webdriver_atoms.js").get("is_enabled");
-        var enabled = _session.getCurrentWindow().evaluate(getEnabledAtom, _getJSON());
-
+        var enabled = _session.getCurrentWindow().evaluate(
+            require("./webdriver_atoms.js").get("is_enabled"),
+            _getJSON());
         res.respondBasedOnResult(_session, req, enabled);
     },
 
@@ -158,7 +176,7 @@ ghostdriver.WebElementReqHand = function(id, session) {
         var attributeValueAtom = require("./webdriver_atoms.js").get("get_attribute_value"),
             result;
 
-        if (typeof(req.urlParsed.file) !== "undefined") {
+        if (typeof(req.urlParsed.file) === "string" && req.urlParsed.file.length > 0) {
             // Read the attribute
             result = _session.getCurrentWindow().evaluate(
                 attributeValueAtom,     // < Atom to read an attribute
@@ -172,9 +190,29 @@ ghostdriver.WebElementReqHand = function(id, session) {
         throw _errors.createInvalidReqMissingCommandParameterEH(req);
     },
 
+    _getTextCommand = function(req, res) {
+        var result = _session.getCurrentWindow().evaluate(
+            require("./webdriver_atoms.js").get("get_text"),
+            _getJSON());
+        res.respondBasedOnResult(_session, req, result);
+    },
+
+    _getEqualsCommand = function(req, res) {
+        var result;
+
+        if (typeof(req.urlParsed.file) === "string" && req.urlParsed.file.length > 0) {
+            result = _session.getCurrentWindow().evaluate(
+                require("./webdriver_atoms.js").get("execute_script"),
+                "return arguments[0].isSameNode(arguments[1]);",
+                [_getJSON(), _getJSON(req.urlParsed.file)]);
+            res.success(_session.getId(), result);
+        }
+
+        throw _errors.createInvalidReqMissingCommandParameterEH(req);
+    },
+
     _submitCommand = function(req, res) {
-        var submitRes,
-            submitAtom = require("./webdriver_atoms.js").get("submit");
+        var submitRes;
 
         // Listen for the page to Finish Loading after the submit
         _getSession().getCurrentWindow().setOneShotCallback("onLoadFinished", function(status) {
@@ -186,28 +224,62 @@ ghostdriver.WebElementReqHand = function(id, session) {
             // TODO - clear thing up after we are done waiting
         });
 
-        submitRes = _getSession().getCurrentWindow().evaluate(submitAtom, _getJSON());
+        submitRes = _getSession().getCurrentWindow().evaluate(
+            require("./webdriver_atoms.js").get("submit"),
+            _getJSON());
 
         // TODO - Error handling based on the value of "submitRes"
     },
 
     _postClickCommand = function(req, res) {
-        var clickAtom = require("./webdriver_atoms.js").get("click");
-        var result = _session.getCurrentWindow().evaluate(clickAtom, _getJSON());
+        var result = _session.getCurrentWindow().evaluate(
+                require("./webdriver_atoms.js").get("click"),
+                _getJSON());
+
+        res.respondBasedOnResult(_session, req, result);
+    },
+
+    _getSelectedCommand = function(req, res) {
+        var result = JSON.parse(_session.getCurrentWindow().evaluate(
+                require("./webdriver_atoms.js").get("is_selected"),
+                _getJSON()));
 
         res.respondBasedOnResult(_session, req, result);
     },
 
     _postClearCommand = function(req, res) {
-        var clearAtom = require("./webdriver_atoms.js").get("clear");
-        var result = _session.getCurrentWindow().evaluate(clearAtom, _getJSON());
-
+        var result = _session.getCurrentWindow().evaluate(
+                require("./webdriver_atoms.js").get("clear"),
+                _getJSON());
         res.respondBasedOnResult(_session, req, result);
     },
 
-    _getJSON = function() {
+    _getCssCommand = function(req, res) {
+        var cssPropertyName = req.urlParsed.file,
+            result;
+
+        // Check that a property name was indeed provided
+        if (typeof(cssPropertyName) === "string" || cssPropertyName.length > 0) {
+            result = _session.getCurrentWindow().evaluate(
+                require("./webdriver_atoms.js").get("execute_script"),
+                "return window.getComputedStyle(arguments[0]).getPropertyValue(arguments[1]);",
+                [_getJSON(), cssPropertyName]);
+
+            res.respondBasedOnResult(_session, req, result);
+            return;
+        }
+
+        throw _errors.createInvalidReqMissingCommandParameterEH(req);
+    },
+
+    /** This method can generate any Element JSON: just provide an ID.
+     * Will return the one of the current Element if no ID is provided.
+     * @param elementId ID of the Element to describe in JSON format,
+     *      or undefined to get the one fo the current Element.
+     */
+    _getJSON = function(elementId) {
         return {
-            "ELEMENT" : _getId()
+            "ELEMENT" : elementId || _getId()
         };
     },
 
