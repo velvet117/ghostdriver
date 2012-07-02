@@ -35,12 +35,16 @@ ghostdriver.WebElementReqHand = function(id, session) {
     _session = session,
     _protoParent = ghostdriver.WebElementReqHand.prototype,
     _const = {
+        CLICK           : "click",
         VALUE           : "value",
         SUBMIT          : "submit",
+        CLEAR           : "clear",
+        ENABLED         : "enabled",
         DISPLAYED       : "displayed",
         ATTRIBUTE       : "attribute",
-        NAME            : "name"
-
+        NAME            : "name",
+        LOCATION        : "location",
+        SIZE            : "size"   
     },
     _errors = require("./errors.js"),
 
@@ -66,7 +70,22 @@ ghostdriver.WebElementReqHand = function(id, session) {
         } else if (req.urlParsed.file === _const.NAME && req.method === "GET") {
             _getNameCommand(req, res);
             return;
-        } // else ...
+        } else if (req.urlParsed.file === _const.CLICK && req.method === "POST") {
+            _postClickCommand(req, res);
+            return;
+        } else if (req.urlParsed.file === _const.CLEAR && req.method === "POST") {
+            _postClearCommand(req, res);
+            return;
+        } else if (req.urlParsed.file === _const.LOCATION && req.method === "GET") {
+            _getLocationCommand(req, res);
+            return;
+        } else if (req.urlParsed.file === _const.SIZE && req.method === "GET") {
+            _getSizeCommand(req, res);
+            return;
+        } else if (req.urlParsed.file === _const.ENABLED && req.method === "GET") {
+            _getEnabledCommand(req, res);
+            return;
+            // else ...
 
         // TODO lots to do...
 
@@ -77,6 +96,27 @@ ghostdriver.WebElementReqHand = function(id, session) {
         var isDisplayedAtom = require("./webdriver_atoms.js").get("is_displayed");
         var displayed = _session.getCurrentWindow().evaluate(isDisplayedAtom, _getJSON());
         res.respondBasedOnResult(_session, req, displayed);
+    },
+
+    _getLocationCommand = function(req, res) {
+        var getLocationAtom = require("./webdriver_atoms.js").get("get_location");
+        var getLocation = _session.getCurrentWindow().evaluate(getLocationAtom, _getJSON());
+
+        res.respondBasedOnResult(_session, req, getLocation);
+    },
+
+    _getSizeCommand = function(req, res) {
+        var getSizeAtom = require("./webdriver_atoms.js").get("get_size");
+        var getSize = _session.getCurrentWindow().evaluate(getSizeAtom, _getJSON());
+
+        res.respondBasedOnResult(_session, req, getSize);
+    },
+
+    _getEnabledCommand = function(req, res) {
+        var getEnabledAtom = require("./webdriver_atoms.js").get("is_enabled");
+        var enabled = _session.getCurrentWindow().evaluate(getEnabledAtom, _getJSON());
+
+        res.respondBasedOnResult(_session, req, enabled);
     },
 
     _valueCommand = function(req, res) {
@@ -149,6 +189,20 @@ ghostdriver.WebElementReqHand = function(id, session) {
         submitRes = _getSession().getCurrentWindow().evaluate(submitAtom, _getJSON());
 
         // TODO - Error handling based on the value of "submitRes"
+    },
+
+    _postClickCommand = function(req, res) {
+        var clickAtom = require("./webdriver_atoms.js").get("click");
+        var result = _session.getCurrentWindow().evaluate(clickAtom, _getJSON());
+
+        res.respondBasedOnResult(_session, req, result);
+    },
+
+    _postClearCommand = function(req, res) {
+        var clearAtom = require("./webdriver_atoms.js").get("clear");
+        var result = _session.getCurrentWindow().evaluate(clearAtom, _getJSON());
+
+        res.respondBasedOnResult(_session, req, result);
     },
 
     _getJSON = function() {
